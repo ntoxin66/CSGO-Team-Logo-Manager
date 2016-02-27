@@ -1,5 +1,6 @@
 #include <sourcemod>
 #include <sdktools>
+#include <cstrike>
 #pragma semicolon 1
 #pragma newdecls required
 
@@ -20,6 +21,9 @@ bool g_bTeamNames = false;
 
 Handle g_hHalftimeTeamswitch = null;
 bool g_bHalftimeTeamswitch = false;
+
+Handle g_hAutoLogos = null;
+bool g_bAutoLogos = false;
 
 public Plugin myinfo =
 {
@@ -73,11 +77,18 @@ public void OnPluginStart()
 	g_bTeamNames = GetConVarBool(g_hTeamNames);
 	HookConVarChange(g_hTeamNames, OnConvarChanged);
 	
-	g_hHalftimeTeamswitch = CreateConVar("teamlogo_halftime_teamswitch", "0", "Plugin will switch team logo's and names at half time.");
+	g_hHalftimeTeamswitch = CreateConVar("teamlogo_halftime_teamswitch", "0", "Plugin will switch team logos and names at half time.");
 	g_bHalftimeTeamswitch = GetConVarBool(g_hHalftimeTeamswitch);
 	HookConVarChange(g_hHalftimeTeamswitch, OnConvarChanged);
 	
+	g_hAutoLogos = CreateConVar("teamlogo_autologos", "0", "Plugin will auto-select team logos based on player's clan tags.");
+	g_bAutoLogos = GetConVarBool(g_hAutoLogos);
+	HookConVarChange(g_hAutoLogos, OnConvarChanged);
+	
 	HookEvent("announce_phase_end", OnAnnouncePhaseEnd);
+	HookEvent("player_spawn", OnPlayerSpawn, EventHookMode_Post);
+	HookEvent("player_disconnect", OnPlayerDisconnect, EventHookMode_Post);
+	HookEvent("player_team", OnTeamChange, EventHookMode_Post);
 }
 
 public void OnConvarChanged(Handle cvar, const char[] oldVal, const char[] newVal)
@@ -110,6 +121,10 @@ public void OnConvarChanged(Handle cvar, const char[] oldVal, const char[] newVa
 	else if (cvar == g_hHalftimeTeamswitch)
 	{
 		g_bHalftimeTeamswitch = StringToInt(newVal) == 0 ? false : true;
+	}
+	else if (cvar == g_hAutoLogos)
+	{
+		g_bAutoLogos = StringToInt(newVal) == 0 ? false : true;
 	}
 }
 
@@ -306,4 +321,92 @@ public Action OnAnnouncePhaseEnd(Handle event, const char[] name, bool dontBroad
 	SetConVarString(g_hTeamLogo1, logo2);
 	SetConVarString(g_hTeamLogo2, logo1);
 	return Plugin_Continue;
+}
+
+
+public Action OnPlayerSpawn(Handle event, const char[] name, bool dontBroadcast)
+{
+	
+	autoLogo(CS_TEAM_T);
+	autoLogo(CS_TEAM_CT);
+	return Plugin_Continue;
+	
+}
+
+public Action OnPlayerDisconnect(Handle event, const char[] name, bool dontBroadcast)
+{
+	
+	autoLogo(CS_TEAM_T);
+	autoLogo(CS_TEAM_CT);
+	return Plugin_Continue;
+	
+}
+
+public Action OnTeamChange(Handle event, const char[] name, bool dontBroadcast)
+{
+	
+	autoLogo(CS_TEAM_T);
+	autoLogo(CS_TEAM_CT);
+	return Plugin_Continue;
+	
+}
+
+public void autoLogo(int team) {
+	
+	if (!g_bAutoLogos) {
+		return;
+	}
+	
+	char name[65];
+	bool found = false;
+	bool match = true;
+	
+	for (int i=1; i<=MaxClients; i++) {
+		if (IsClientConnected(i) && IsClientInGame(i) && !IsFakeClient(i)) {
+			if (GetClientTeam(i) == team) {
+				char newname[65];
+				CS_GetClientClanTag(i, newname, sizeof(newname));
+				if (newname[0] != EOS) {
+					if (found) {
+						if (!StrEqual(name, newname)) {
+							match = false;
+						}
+					} else {
+						found = true;
+						strcopy(name, sizeof(name), newname);
+					}
+				}
+			}
+		}
+	}
+	
+	if (team == CS_TEAM_CT) {
+		team = 1;
+	}
+	if (team == CS_TEAM_T) {
+		team = 2;
+	}
+	
+	if (found && match) {
+		char logo[6];
+		
+		int j=0;
+		for (int i=0; i<= 64; i++) {
+			if (name[i] == EOS || j == 5) {
+				logo[j] = EOS;
+				j++;
+				i = 65;
+			} else if (IsCharAlpha(name[i]) || IsCharNumeric(name[i])) {
+				logo[j] = name[i];
+				j++;
+			}
+		}
+		
+		ServerCommand("mp_teamlogo_%d \"%s\"", team, logo);
+	} else {
+		ServerCommand("mp_teamlogo_%d \"\"", team);
+	}
+	
+	
+	
 }
