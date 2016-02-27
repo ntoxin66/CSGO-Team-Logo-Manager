@@ -25,6 +25,11 @@ bool g_bHalftimeTeamswitch = false;
 Handle g_hAutoLogos = null;
 bool g_bAutoLogos = false;
 
+bool autoActive_1 = false;
+bool autoActive_2 = false;
+char autoCache_1[128];
+char autoCache_2[128];
+
 public Plugin myinfo =
 {
     name = "Team Logo Management",
@@ -112,11 +117,17 @@ public void OnConvarChanged(Handle cvar, const char[] oldVal, const char[] newVa
 	{
 		if (g_bTeamNames && !StrEqual(oldVal, newVal))
 			SetTeamName(newVal, 1);
+		
+		if (!autoActive_1)
+			strcopy(autoCache_1, sizeof(autoCache_1), newVal);
 	}
 	else if (cvar == g_hTeamLogo2)
 	{
 		if (g_bTeamNames && !StrEqual(oldVal, newVal))
 			SetTeamName(newVal, 2);
+		
+		if (!autoActive_2)
+			strcopy(autoCache_2, sizeof(autoCache_2), newVal);
 	}
 	else if (cvar == g_hHalftimeTeamswitch)
 	{
@@ -331,9 +342,6 @@ public Action OnAnnouncePhaseEnd(Handle event, const char[] name, bool dontBroad
 
 public Action OnPlayerSpawn(Handle event, const char[] name, bool dontBroadcast)
 {
-	if (!g_bAutoLogos)
-		return Plugin_Continue;
-		
 	SetTeamAutoLogo(CS_TEAM_T);
 	SetTeamAutoLogo(CS_TEAM_CT);
 	return Plugin_Continue;
@@ -341,9 +349,6 @@ public Action OnPlayerSpawn(Handle event, const char[] name, bool dontBroadcast)
 
 public Action OnPlayerDisconnect(Handle event, const char[] name, bool dontBroadcast)
 {
-	if (!g_bAutoLogos)
-		return Plugin_Continue;
-		
 	SetTeamAutoLogo(CS_TEAM_T);
 	SetTeamAutoLogo(CS_TEAM_CT);
 	return Plugin_Continue;
@@ -351,9 +356,6 @@ public Action OnPlayerDisconnect(Handle event, const char[] name, bool dontBroad
 
 public Action OnPlayerTeam(Handle event, const char[] name, bool dontBroadcast)
 {
-	if (!g_bAutoLogos)
-		return Plugin_Continue;
-		
 	SetTeamAutoLogo(CS_TEAM_T);
 	SetTeamAutoLogo(CS_TEAM_CT);
 	return Plugin_Continue;
@@ -361,6 +363,11 @@ public Action OnPlayerTeam(Handle event, const char[] name, bool dontBroadcast)
 
 public void SetTeamAutoLogo(int team)
 {
+	if (!g_bAutoLogos) {
+		revertTeamAutoLogo(team);
+		return;
+	}
+	
 	char name[128];
 	bool found = false;
 	bool match = true;
@@ -393,16 +400,19 @@ public void SetTeamAutoLogo(int team)
 		}
 	}
 	
-	if (team == CS_TEAM_CT)
-		team = 1;
-	else if (team == CS_TEAM_T)
-		team = 2;
-	
 	if (found && match)
 	{
+		if (team == CS_TEAM_CT) {
+			team = 1;
+			autoActive_1 = true;
+		} else if (team == CS_TEAM_T) {
+			team = 2;
+			autoActive_2 = true;
+		}
+		
 		char logo[6];
 		int j=0;
-		for (int i=0; i<= 64; i++)
+		for (int i=0; i<= sizeof(name); i++)
 		{
 			if (name[i] == EOS || j == 5)
 			{
@@ -414,6 +424,22 @@ public void SetTeamAutoLogo(int team)
 				j++;
 			}
 		}
+		
 		ServerCommand("mp_teamlogo_%d \"%s\"", team, logo);
+	} else {
+		revertTeamAutoLogo(team);
 	}
+	
+}
+
+public void revertTeamAutoLogo(int team) 
+{
+	if (team == CS_TEAM_CT && autoActive_1) {
+		ServerCommand("mp_teamlogo_1 \"%s\"", autoCache_1);
+		autoActive_1 = false;
+	} else if (team == CS_TEAM_T && autoActive_2) {
+		ServerCommand("mp_teamlogo_2 \"%s\"", autoCache_2);
+		autoActive_2 = false;
+	}
+	
 }
