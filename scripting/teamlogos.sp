@@ -30,7 +30,7 @@ public Plugin myinfo =
     name = "Team Logo Management",
     author = "Neuro Toxin",
     description = "",
-    version = "1.3.2"
+    version = "1.4.1"
 };
 
 public void OnPluginStart()
@@ -81,14 +81,14 @@ public void OnPluginStart()
 	g_bHalftimeTeamswitch = GetConVarBool(g_hHalftimeTeamswitch);
 	HookConVarChange(g_hHalftimeTeamswitch, OnConvarChanged);
 	
-	g_hAutoLogos = CreateConVar("teamlogo_autologos", "0", "Plugin will auto-select team logos based on player's clan tags.");
+	g_hAutoLogos = CreateConVar("teamlogo_autologos", "0", "Plugin will auto-select team logos based on player clan tags.");
 	g_bAutoLogos = GetConVarBool(g_hAutoLogos);
 	HookConVarChange(g_hAutoLogos, OnConvarChanged);
 	
 	HookEvent("announce_phase_end", OnAnnouncePhaseEnd);
 	HookEvent("player_spawn", OnPlayerSpawn, EventHookMode_Post);
 	HookEvent("player_disconnect", OnPlayerDisconnect, EventHookMode_Post);
-	HookEvent("player_team", OnTeamChange, EventHookMode_Post);
+	HookEvent("player_team", OnPlayerTeam, EventHookMode_Post);
 }
 
 public void OnConvarChanged(Handle cvar, const char[] oldVal, const char[] newVal)
@@ -125,6 +125,11 @@ public void OnConvarChanged(Handle cvar, const char[] oldVal, const char[] newVa
 	else if (cvar == g_hAutoLogos)
 	{
 		g_bAutoLogos = StringToInt(newVal) == 0 ? false : true;
+		if (g_bAutoLogos)
+		{
+			SetTeamAutoLogo(CS_TEAM_CT);
+			SetTeamAutoLogo(CS_TEAM_T);
+		}
 	}
 }
 
@@ -326,87 +331,88 @@ public Action OnAnnouncePhaseEnd(Handle event, const char[] name, bool dontBroad
 
 public Action OnPlayerSpawn(Handle event, const char[] name, bool dontBroadcast)
 {
-	
-	autoLogo(CS_TEAM_T);
-	autoLogo(CS_TEAM_CT);
+	if (!g_bAutoLogos)
+		return Plugin_Continue;
+		
+	SetTeamAutoLogo(CS_TEAM_T);
+	SetTeamAutoLogo(CS_TEAM_CT);
 	return Plugin_Continue;
-	
 }
 
 public Action OnPlayerDisconnect(Handle event, const char[] name, bool dontBroadcast)
 {
-	
-	autoLogo(CS_TEAM_T);
-	autoLogo(CS_TEAM_CT);
+	if (!g_bAutoLogos)
+		return Plugin_Continue;
+		
+	SetTeamAutoLogo(CS_TEAM_T);
+	SetTeamAutoLogo(CS_TEAM_CT);
 	return Plugin_Continue;
-	
 }
 
-public Action OnTeamChange(Handle event, const char[] name, bool dontBroadcast)
+public Action OnPlayerTeam(Handle event, const char[] name, bool dontBroadcast)
 {
-	
-	autoLogo(CS_TEAM_T);
-	autoLogo(CS_TEAM_CT);
+	if (!g_bAutoLogos)
+		return Plugin_Continue;
+		
+	SetTeamAutoLogo(CS_TEAM_T);
+	SetTeamAutoLogo(CS_TEAM_CT);
 	return Plugin_Continue;
-	
 }
 
-public void autoLogo(int team) {
-	
-	if (!g_bAutoLogos) {
-		return;
-	}
-	
-	char name[65];
+public void SetTeamAutoLogo(int team)
+{
+	char name[128];
 	bool found = false;
 	bool match = true;
 	
-	for (int i=1; i<=MaxClients; i++) {
-		if (IsClientConnected(i) && IsClientInGame(i) && !IsFakeClient(i)) {
-			if (GetClientTeam(i) == team) {
-				char newname[65];
-				CS_GetClientClanTag(i, newname, sizeof(newname));
-				if (newname[0] != EOS) {
-					if (found) {
-						if (!StrEqual(name, newname)) {
-							match = false;
-						}
-					} else {
-						found = true;
-						strcopy(name, sizeof(name), newname);
-					}
+	for (int i=1; i<=MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || IsFakeClient(i))
+			continue;
+		
+		if (GetClientTeam(i) != team)
+			continue;
+			
+		char newname[128];
+		CS_GetClientClanTag(i, newname, sizeof(newname));
+		if (newname[0] != EOS)
+		{
+			if (found) {
+				if (!StrEqual(name, newname))
+				{
+					match = false;
+					return;
 				}
+			}
+			else
+			{
+				found = true;
+				strcopy(name, sizeof(name), newname);
 			}
 		}
 	}
 	
-	if (team == CS_TEAM_CT) {
+	if (team == CS_TEAM_CT)
 		team = 1;
-	}
-	if (team == CS_TEAM_T) {
+	else if (team == CS_TEAM_T)
 		team = 2;
-	}
 	
-	if (found && match) {
+	if (found && match)
+	{
 		char logo[6];
-		
 		int j=0;
-		for (int i=0; i<= 64; i++) {
-			if (name[i] == EOS || j == 5) {
+		for (int i=0; i<= 64; i++)
+		{
+			if (name[i] == EOS || j == 5)
+			{
 				logo[j] = EOS;
-				j++;
-				i = 65;
-			} else if (IsCharAlpha(name[i]) || IsCharNumeric(name[i])) {
+				break;
+			}
+			else if (IsCharAlpha(name[i]) || IsCharNumeric(name[i])) {
 				logo[j] = name[i];
 				j++;
 			}
 		}
-		
 		ServerCommand("mp_teamlogo_%d \"%s\"", team, logo);
-	} else {
-		ServerCommand("mp_teamlogo_%d \"\"", team);
 	}
-	
-	
-	
 }
