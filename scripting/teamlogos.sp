@@ -30,7 +30,7 @@ public Plugin myinfo =
     name = "Team Logo Management",
     author = "Neuro Toxin",
     description = "",
-    version = "1.4.1"
+    version = "1.3.2"
 };
 
 public void OnPluginStart()
@@ -86,9 +86,9 @@ public void OnPluginStart()
 	HookConVarChange(g_hAutoLogos, OnConvarChanged);
 	
 	HookEvent("announce_phase_end", OnAnnouncePhaseEnd);
-	HookEvent("player_spawn", OnPlayerSpawned, EventHookMode_Post);
+	HookEvent("player_spawn", OnPlayerSpawn, EventHookMode_Post);
 	HookEvent("player_disconnect", OnPlayerDisconnect, EventHookMode_Post);
-	HookEvent("player_team", OnPlayerTeamChanged, EventHookMode_Post);
+	HookEvent("player_team", OnTeamChange, EventHookMode_Post);
 }
 
 public void OnConvarChanged(Handle cvar, const char[] oldVal, const char[] newVal)
@@ -125,8 +125,6 @@ public void OnConvarChanged(Handle cvar, const char[] oldVal, const char[] newVa
 	else if (cvar == g_hAutoLogos)
 	{
 		g_bAutoLogos = StringToInt(newVal) == 0 ? false : true;
-		if (g_bAutoLogos)
-			SetAutoLogos();
 	}
 }
 
@@ -325,89 +323,90 @@ public Action OnAnnouncePhaseEnd(Handle event, const char[] name, bool dontBroad
 	return Plugin_Continue;
 }
 
-public Action OnPlayerSpawned(Handle event, const char[] name, bool dontBroadcast)
+
+public Action OnPlayerSpawn(Handle event, const char[] name, bool dontBroadcast)
 {
-	SetAutoLogos();
+	
+	autoLogo(CS_TEAM_T);
+	autoLogo(CS_TEAM_CT);
 	return Plugin_Continue;
+	
 }
 
 public Action OnPlayerDisconnect(Handle event, const char[] name, bool dontBroadcast)
 {
-	SetAutoLogos();
-	return Plugin_Continue;
-}
-
-public Action OnPlayerTeamChanged(Handle event, const char[] name, bool dontBroadcast)
-{
-	SetAutoLogos();
-	return Plugin_Continue;
-}
-
-public void SetAutoLogos()
-{
-	if (!g_bAutoLogos)
-		return;
 	
-	char name[128];
+	autoLogo(CS_TEAM_T);
+	autoLogo(CS_TEAM_CT);
+	return Plugin_Continue;
+	
+}
+
+public Action OnTeamChange(Handle event, const char[] name, bool dontBroadcast)
+{
+	
+	autoLogo(CS_TEAM_T);
+	autoLogo(CS_TEAM_CT);
+	return Plugin_Continue;
+	
+}
+
+public void autoLogo(int team) {
+	
+	if (!g_bAutoLogos) {
+		return;
+	}
+	
+	char name[65];
 	bool found = false;
 	bool match = true;
-	int team;
 	
-	for (int client=1; client<MaxClients; client++)
-	{
-		if (!IsClientInGame(client))
-			continue;
-		
-		if (IsFakeClient(client))
-			continue;
-		
-		team = GetClientTeam(client);
-		if (team == CS_TEAM_NONE || team == CS_TEAM_SPECTATOR)
-			continue;
-		
-		char newname[128];
-		CS_GetClientClanTag(client, newname, sizeof(newname));
-		if (newname[0] != EOS)
-		{
-			if (found)
-			{
-				if (!StrEqual(name, newname))
-				{
-					match = false;
-					break;
+	for (int i=1; i<=MaxClients; i++) {
+		if (IsClientConnected(i) && IsClientInGame(i) && !IsFakeClient(i)) {
+			if (GetClientTeam(i) == team) {
+				char newname[65];
+				CS_GetClientClanTag(i, newname, sizeof(newname));
+				if (newname[0] != EOS) {
+					if (found) {
+						if (!StrEqual(name, newname)) {
+							match = false;
+						}
+					} else {
+						found = true;
+						strcopy(name, sizeof(name), newname);
+					}
 				}
-			}
-			else
-			{
-				found = true;
-				strcopy(name, sizeof(name), newname);
 			}
 		}
 	}
 	
-	if (found && match)
-	{
+	if (team == CS_TEAM_CT) {
+		team = 1;
+	}
+	if (team == CS_TEAM_T) {
+		team = 2;
+	}
+	
+	if (found && match) {
 		char logo[6];
+		
 		int j=0;
-		for (int i=0; i<= 64; i++)
-		{
-			if (name[i] == EOS || j == 5)
-			{
+		for (int i=0; i<= 64; i++) {
+			if (name[i] == EOS || j == 5) {
 				logo[j] = EOS;
-				break;
-			}
-			else if (IsCharAlpha(name[i]) || IsCharNumeric(name[i]))
-			{
+				j++;
+				i = 65;
+			} else if (IsCharAlpha(name[i]) || IsCharNumeric(name[i])) {
 				logo[j] = name[i];
 				j++;
 			}
 		}
-		ServerCommand("mp_teamlogo_1 \"%s\"", logo);
-		ServerCommand("mp_teamlogo_2 \"%s\"", logo);
+		
+		ServerCommand("mp_teamlogo_%d \"%s\"", team, logo);
+	} else {
+		ServerCommand("mp_teamlogo_%d \"\"", team);
 	}
-	else
-	{
-		ServerCommand("mp_teamlogo_1 \"\"");
-		ServerCommand("mp_teamlogo_2 \"\"");
-	}
+	
+	
+	
 }
