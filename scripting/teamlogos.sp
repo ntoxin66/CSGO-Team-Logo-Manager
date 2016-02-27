@@ -377,7 +377,8 @@ public void SetTeamAutoLogo(int team)
 		CS_GetClientClanTag(i, newname, sizeof(newname));
 		if (newname[0] != EOS)
 		{
-			if (found) {
+			if (found)
+			{
 				if (!StrEqual(name, newname))
 				{
 					match = false;
