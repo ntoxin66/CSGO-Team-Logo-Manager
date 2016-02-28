@@ -442,14 +442,14 @@ public void CacheTeamLogo(int team)
 		if (g_cTeamLogo1Cache[0] != '\0')
 			return;
 		
-		GetConVarString(g_hTeamLogo1, g_cTeamLogo1Cache, sizeof(g_cTeamLogo1Cache));
+		GetConVarString(g_hTeamLogo1, g_cTeamLogo1Cache, MAX_TEAMNAME_LENGTH);
 	}
 	else if (team == CS_TEAM_T)
 	{
 		if (g_cTeamLogo2Cache[0] != '\0')
 			return;
 	
-		GetConVarString(g_hTeamLogo1, g_cTeamLogo2Cache, sizeof(g_cTeamLogo2Cache));
+		GetConVarString(g_hTeamLogo2, g_cTeamLogo2Cache, MAX_TEAMNAME_LENGTH);
 	}
 }
 
