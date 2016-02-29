@@ -4,6 +4,8 @@
 #pragma semicolon 1
 #pragma newdecls required
 
+#define MAX_TEAMNAME_LENGTH			128
+
 Handle g_hTeamLogos = null;
 Handle g_hTeamLogo1 = null;
 Handle g_hTeamLogo2 = null;
@@ -25,12 +27,15 @@ bool g_bHalftimeTeamswitch = false;
 Handle g_hAutoLogos = null;
 bool g_bAutoLogos = false;
 
+char g_cTeamLogo1Cache[MAX_TEAMNAME_LENGTH];
+char g_cTeamLogo2Cache[MAX_TEAMNAME_LENGTH];
+
 public Plugin myinfo =
 {
     name = "Team Logo Management",
     author = "Neuro Toxin",
     description = "",
-    version = "1.4.1"
+    version = "1.4.2"
 };
 
 public void OnPluginStart()
@@ -130,6 +135,11 @@ public void OnConvarChanged(Handle cvar, const char[] oldVal, const char[] newVa
 			SetTeamAutoLogo(CS_TEAM_CT);
 			SetTeamAutoLogo(CS_TEAM_T);
 		}
+		else
+		{
+			RestoreTeamLogo(CS_TEAM_CT);
+			RestoreTeamLogo(CS_TEAM_T);
+		}
 	}
 }
 
@@ -139,7 +149,7 @@ public void OnMapStart()
 		CloseHandle(g_hTeamLogos);
 	
 	if (g_bRandomLogos)
-		g_hTeamLogos = CreateArray(128);
+		g_hTeamLogos = CreateArray(MAX_TEAMNAME_LENGTH);
 		
 	AddTeamLogosToDownloadTable();
 	
@@ -225,9 +235,9 @@ stock void SetTeamLogos(int logocount)
 			team2logo = GetRandomInt(0, logocount - 1);
 	}
 
-	char logo1[64]; char logo2[64];
-	GetArrayString(g_hTeamLogos, team1logo, logo1, sizeof(logo1));
-	GetArrayString(g_hTeamLogos, team2logo, logo2, sizeof(logo2));
+	char logo1[MAX_TEAMNAME_LENGTH]; char logo2[MAX_TEAMNAME_LENGTH];
+	GetArrayString(g_hTeamLogos, team1logo, logo1, MAX_TEAMNAME_LENGTH);
+	GetArrayString(g_hTeamLogos, team2logo, logo2, MAX_TEAMNAME_LENGTH);
 	
 	SetConVarString(g_hTeamLogo1, logo1);
 	SetConVarString(g_hTeamLogo2, logo2);
@@ -275,7 +285,7 @@ stock void AddDefaultTeamLogos()
 
 stock void SetTeamName(const char[] logo, int team)
 {
-	char cfgpath[PLATFORM_MAX_PATH]; char teamname[128];
+	char cfgpath[PLATFORM_MAX_PATH]; char teamname[MAX_TEAMNAME_LENGTH];
 	Format(cfgpath, sizeof(cfgpath), "resource/flash/econ/tournaments/teams/%s.cfg", logo);
 	Handle cfgstream = OpenFile(cfgpath, "r");
 	
@@ -285,7 +295,7 @@ stock void SetTeamName(const char[] logo, int team)
 		return;
 	}
 	
-	if (ReadFileString(cfgstream, teamname, sizeof(teamname)) > 0)
+	if (ReadFileString(cfgstream, teamname, MAX_TEAMNAME_LENGTH) > 0)
 	{
 		if (team == 1)
 			SetConVarString(g_hTeamName1, teamname);
@@ -298,12 +308,12 @@ stock void SetTeamName(const char[] logo, int team)
 
 stock void SetTeamNames()
 {
-	char logo[128];
-	GetConVarString(g_hTeamLogo1, logo, sizeof(logo));
+	char logo[MAX_TEAMNAME_LENGTH];
+	GetConVarString(g_hTeamLogo1, logo, MAX_TEAMNAME_LENGTH);
 	if (!StrEqual(logo, ""))
 		SetTeamName(logo, 1);
 	
-	GetConVarString(g_hTeamLogo2, logo, sizeof(logo));
+	GetConVarString(g_hTeamLogo2, logo, MAX_TEAMNAME_LENGTH);
 	if (!StrEqual(logo, ""))
 		SetTeamName(logo, 2);
 }
@@ -313,13 +323,13 @@ public Action OnAnnouncePhaseEnd(Handle event, const char[] name, bool dontBroad
 	if (!g_bTeamNames || !g_bHalftimeTeamswitch)
 		return Plugin_Continue;
 		
-	char logo1[128]; char logo2[128];
+	char logo1[MAX_TEAMNAME_LENGTH]; char logo2[MAX_TEAMNAME_LENGTH];
 	
-	GetConVarString(g_hTeamLogo1, logo1, sizeof(logo1));
+	GetConVarString(g_hTeamLogo1, logo1, MAX_TEAMNAME_LENGTH);
 	if (StrEqual(logo1, ""))
 		return Plugin_Continue;
 
-	GetConVarString(g_hTeamLogo2, logo2, sizeof(logo2));
+	GetConVarString(g_hTeamLogo2, logo2, MAX_TEAMNAME_LENGTH);
 	if (StrEqual(logo2, ""))
 		return Plugin_Continue;
 		
@@ -360,21 +370,21 @@ public Action OnPlayerTeam(Handle event, const char[] name, bool dontBroadcast)
 }
 
 public void SetTeamAutoLogo(int team)
-{
-	char name[128];
+{	
+	char name[MAX_TEAMNAME_LENGTH];
 	bool found = false;
 	bool match = true;
 	
-	for (int i=1; i<=MaxClients; i++)
+	for (int client=1; client < MaxClients; client++)
 	{
-		if (!IsClientInGame(i) || IsFakeClient(i))
+		if (!IsClientInGame(client) || IsFakeClient(client))
 			continue;
 		
-		if (GetClientTeam(i) != team)
+		if (GetClientTeam(client) != team)
 			continue;
 			
-		char newname[128];
-		CS_GetClientClanTag(i, newname, sizeof(newname));
+		char newname[MAX_TEAMNAME_LENGTH];
+		CS_GetClientClanTag(client, newname, MAX_TEAMNAME_LENGTH);
 		if (newname[0] != EOS)
 		{
 			if (found)
@@ -382,38 +392,84 @@ public void SetTeamAutoLogo(int team)
 				if (!StrEqual(name, newname))
 				{
 					match = false;
-					return;
+					break;
 				}
 			}
 			else
 			{
 				found = true;
-				strcopy(name, sizeof(name), newname);
+				strcopy(name, MAX_TEAMNAME_LENGTH, newname);
 			}
 		}
 	}
 	
-	if (team == CS_TEAM_CT)
-		team = 1;
-	else if (team == CS_TEAM_T)
-		team = 2;
-	
 	if (found && match)
 	{
+		if (team == CS_TEAM_CT)
+			team = 1;
+		else if (team == CS_TEAM_T)
+			team = 2;
+		
 		char logo[6];
 		int j=0;
-		for (int i=0; i<= 64; i++)
+		for (int i=0; i<= MAX_TEAMNAME_LENGTH; i++)
 		{
 			if (name[i] == EOS || j == 5)
 			{
 				logo[j] = EOS;
 				break;
 			}
-			else if (IsCharAlpha(name[i]) || IsCharNumeric(name[i])) {
+			else if (IsCharAlpha(name[i]) || IsCharNumeric(name[i]))
+			{
 				logo[j] = name[i];
 				j++;
 			}
 		}
+		
+		// Always attempt to cache
+		CacheTeamLogo(team);
 		ServerCommand("mp_teamlogo_%d \"%s\"", team, logo);
+	}
+	else
+		RestoreTeamLogo(team);
+}
+
+public void CacheTeamLogo(int team)
+{
+	// Never override cache
+	if (team == CS_TEAM_CT)
+	{
+		if (g_cTeamLogo1Cache[0] != '\0')
+			return;
+		
+		GetConVarString(g_hTeamLogo1, g_cTeamLogo1Cache, MAX_TEAMNAME_LENGTH);
+	}
+	else if (team == CS_TEAM_T)
+	{
+		if (g_cTeamLogo2Cache[0] != '\0')
+			return;
+	
+		GetConVarString(g_hTeamLogo2, g_cTeamLogo2Cache, MAX_TEAMNAME_LENGTH);
+	}
+}
+
+public void RestoreTeamLogo(int team) 
+{
+	// Only restore if we have cache
+	if (team == CS_TEAM_CT)
+	{
+		if (g_cTeamLogo1Cache[0] == '\0')
+			return;
+		
+		ServerCommand("mp_teamlogo_1 \"%s\"", g_cTeamLogo1Cache);
+		g_cTeamLogo1Cache[0] = '\0';
+	}
+	else if (team == CS_TEAM_T)
+	{
+		if (g_cTeamLogo2Cache[0] == '\0')
+			return;
+			
+		ServerCommand("mp_teamlogo_2 \"%s\"", g_cTeamLogo2Cache);
+		g_cTeamLogo2Cache[0] = '\0';
 	}
 }
