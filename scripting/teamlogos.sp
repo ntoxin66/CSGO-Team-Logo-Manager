@@ -29,6 +29,8 @@ bool g_bAutoLogos = false;
 
 char g_cTeamLogo1Cache[MAX_TEAMNAME_LENGTH];
 char g_cTeamLogo2Cache[MAX_TEAMNAME_LENGTH];
+bool g_bTeamLogo1Cache;
+bool g_bTeamLogo2Cache;
 
 public Plugin myinfo =
 {
@@ -439,16 +441,18 @@ public void CacheTeamLogo(int team)
 	// Never override cache
 	if (team == CS_TEAM_CT)
 	{
-		if (g_cTeamLogo1Cache[0] != '\0')
+		if (g_bTeamLogo1Cache)
 			return;
 		
+		g_bTeamLogo1Cache = true;
 		GetConVarString(g_hTeamLogo1, g_cTeamLogo1Cache, MAX_TEAMNAME_LENGTH);
 	}
 	else if (team == CS_TEAM_T)
 	{
-		if (g_cTeamLogo2Cache[0] != '\0')
+		if (g_bTeamLogo2Cache)
 			return;
 	
+		g_bTeamLogo2Cache = true;
 		GetConVarString(g_hTeamLogo2, g_cTeamLogo2Cache, MAX_TEAMNAME_LENGTH);
 	}
 }
@@ -458,17 +462,19 @@ public void RestoreTeamLogo(int team)
 	// Only restore if we have cache
 	if (team == CS_TEAM_CT)
 	{
-		if (g_cTeamLogo1Cache[0] == '\0')
+		if (!g_bTeamLogo1Cache)
 			return;
 		
+		g_bTeamLogo1Cache = false;
 		ServerCommand("mp_teamlogo_1 \"%s\"", g_cTeamLogo1Cache);
 		g_cTeamLogo1Cache[0] = '\0';
 	}
 	else if (team == CS_TEAM_T)
 	{
-		if (g_cTeamLogo2Cache[0] == '\0')
+		if (!g_bTeamLogo2Cache)
 			return;
 			
+		g_bTeamLogo2Cache = false;
 		ServerCommand("mp_teamlogo_2 \"%s\"", g_cTeamLogo2Cache);
 		g_cTeamLogo2Cache[0] = '\0';
 	}
