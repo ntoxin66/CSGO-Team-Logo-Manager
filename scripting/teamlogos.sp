@@ -30,6 +30,8 @@ bool g_bAutoLogos = false;
 char g_cTeamLogo1Cache[MAX_TEAMNAME_LENGTH];
 char g_cTeamLogo2Cache[MAX_TEAMNAME_LENGTH];
 
+static bool g_bCacheTeamLogo = true;
+
 public Plugin myinfo =
 {
     name = "Team Logo Management",
@@ -115,11 +117,17 @@ public void OnConvarChanged(Handle cvar, const char[] oldVal, const char[] newVa
 	}
 	else if (cvar == g_hTeamLogo1)
 	{
+		if (g_bCacheTeamLogo)
+			CacheTeamLogo(CS_TEAM_CT);
+		
 		if (g_bTeamNames && !StrEqual(oldVal, newVal))
 			SetTeamName(newVal, 1);
 	}
 	else if (cvar == g_hTeamLogo2)
 	{
+		if (g_bCacheTeamLogo)
+			CacheTeamLogo(CS_TEAM_T);
+			
 		if (g_bTeamNames && !StrEqual(oldVal, newVal))
 			SetTeamName(newVal, 2);
 	}
@@ -426,9 +434,9 @@ public void SetTeamAutoLogo(int team)
 			}
 		}
 		
-		// Always attempt to cache
-		CacheTeamLogo(team);
+		g_bCacheTeamLogo = false;
 		ServerCommand("mp_teamlogo_%d \"%s\"", team, logo);
+		g_bCacheTeamLogo = true;
 	}
 	else
 		RestoreTeamLogo(team);
@@ -436,40 +444,16 @@ public void SetTeamAutoLogo(int team)
 
 public void CacheTeamLogo(int team)
 {
-	// Never override cache
 	if (team == CS_TEAM_CT)
-	{
-		if (g_cTeamLogo1Cache[0] != '\0')
-			return;
-		
 		GetConVarString(g_hTeamLogo1, g_cTeamLogo1Cache, MAX_TEAMNAME_LENGTH);
-	}
 	else if (team == CS_TEAM_T)
-	{
-		if (g_cTeamLogo2Cache[0] != '\0')
-			return;
-	
 		GetConVarString(g_hTeamLogo2, g_cTeamLogo2Cache, MAX_TEAMNAME_LENGTH);
-	}
 }
 
 public void RestoreTeamLogo(int team) 
 {
-	// Only restore if we have cache
 	if (team == CS_TEAM_CT)
-	{
-		if (g_cTeamLogo1Cache[0] == '\0')
-			return;
-		
 		ServerCommand("mp_teamlogo_1 \"%s\"", g_cTeamLogo1Cache);
-		g_cTeamLogo1Cache[0] = '\0';
-	}
 	else if (team == CS_TEAM_T)
-	{
-		if (g_cTeamLogo2Cache[0] == '\0')
-			return;
-			
 		ServerCommand("mp_teamlogo_2 \"%s\"", g_cTeamLogo2Cache);
-		g_cTeamLogo2Cache[0] = '\0';
-	}
 }
